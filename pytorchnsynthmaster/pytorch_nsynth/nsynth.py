@@ -127,12 +127,13 @@ class NSynth(data.Dataset):
 class SignalTransformation():
 
      #Sample rate por defecto
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     TARGET_SAMPLE_RATE=16000
     #Usamos espectogramas de MEL por defecto al utilizar instrumentos musicales para captar las frecuencias melódicas de forma entendible para humanos y para el modelo
     TRANSFORMATION=torchaudio.transforms.MelSpectrogram(sample_rate=TARGET_SAMPLE_RATE,
                                                       n_fft=1024, 
                                                       hop_length=512,
-                                                      n_mels=64)
+                                                      n_mels=64).to(device)
 
     def __init__(self, fichero, label):
         self.fichero=fichero
@@ -142,6 +143,19 @@ class SignalTransformation():
         signal = self.TRANSFORMATION(self.getSignalTuned())
         return signal
 
+    @classmethod
+    def generarSpectrogramaFromSignal(cls, signal):
+        signal = cls.monoTransformClass(signal)
+        signal = cls.samplingTransformClass(signal,cls.TARGET_SAMPLE_RATE)
+        signal = cls.TRANSFORMATION(signal)
+        return signal
+
+    @classmethod
+    def generarSTFTFromSignal(cls,signal):
+        signal = cls.monoTransformClass(signal)
+        signal = cls.samplingTransformClass(signal,cls.TARGET_SAMPLE_RATE)
+        signal = torchaudio.transforms.Spectrogram().to(cls.device)(signal)
+        return signal
     def getSignal(self):
         #La ruta va desde el fichero donde se encuentra el jupyter notebook
         return torchaudio.load("nsynth-valid/audio/"+self.fichero)
@@ -162,7 +176,19 @@ class SignalTransformation():
         if sample_rate != self.TARGET_SAMPLE_RATE:
             signal = torchaudio.transforms.signalResample(sample_rate,self.TARGET_SAMPLE_RATE)(signal)
         return signal
+
+    @classmethod
+    def samplingTransformClass(cls,signal,sample_rate):
+        #Usamos sample_rate 16000 por defecto
+        if sample_rate != cls.TARGET_SAMPLE_RATE:
+            signal = torchaudio.transforms.signalResample(sample_rate,cls.TARGET_SAMPLE_RATE)(signal)
+        return signal
             
+    @classmethod        
+    def monoTransformClass(cls, signal):
+        if signal.shape[0] > 1:
+            signal = torch.mean(signal, dim=0,keepdim=True)
+        return signal
 
     def monoTransform(self,signal):
         if signal.shape[0] > 1:
