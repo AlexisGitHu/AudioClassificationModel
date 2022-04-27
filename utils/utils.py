@@ -50,13 +50,14 @@ def generate_spectrogram(file_route):
 #window_duration: salto de tiempo en segundos
 def separar(audio_path, save_path, window_duration):
     waveform, sample_rate = torchaudio.load(audio_path)
+    waveform = waveform.to('cuda:0')
     dimension = waveform.size(dim=1)
 
     anterior = 1
     i=0
     k=window_duration * sample_rate
-    while (anterior+64000) <= dimension:
-            audio = torch.narrow(waveform, dim=1, start = anterior, length = 64000)
+    while (anterior+sample_rate*4) <= dimension:
+            audio = torch.narrow(waveform, dim=1, start = anterior, length = sample_rate*4)
             anterior = anterior + k
             #print(prueba.size(dim=1))
 
