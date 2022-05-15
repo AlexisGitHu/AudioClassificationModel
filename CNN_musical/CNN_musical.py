@@ -4,9 +4,12 @@ import torch
 import torchvision
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
+from torch.utils.data.dataloader import DataLoader
 import os
 import torch.nn as nn
 import torch.nn.functional as F
+
+INSTRUMENTS = ['bass', 'brass', 'flute', 'guitar', 'keyboard', 'mallet', 'organ', 'reed', 'string', 'vocal']
 
 # Creamos una clase de clasificacion de imagenes para que el modelo pueda hacer uso de esta
 class ImageClassificationBase(nn.Module):
@@ -123,3 +126,31 @@ def fit(epochs, lr, model, train_loader, val_loader, opt_func=torch.optim.SGD):
         history.append(result)
 
     return history
+
+# Hacemos un predict sobre un input y devolvemos el índice de clase predicho
+def single_predict(model, input):
+    model.eval()
+    with torch.no_grad():
+        predictions = model(input)
+        predicted_index = predictions[0].argmax(0)
+    return predicted_index.item()
+
+
+# Tratamos de predecir el audio en espectrogramas, donde tiene las imagenes en <data_dir/espectrogramas>
+# De nuevo, ajustamos el device al que tengamos disponible
+def predict(model, data_dir, device):
+    dataset = ImageFolder(data_dir,transform = transforms.Compose([
+    transforms.Resize((150,150)),transforms.ToTensor()
+    ]))
+    data=DataLoader(dataset, 1, num_workers = 4, pin_memory = True)
+
+    predicciones = []
+    for batch in data:
+        indicePredicho=single_predict(model,batch[0].to(device))
+        predicciones.append(indicePredicho)
+    
+    return predicciones
+
+# Tratamos de devolver el índice que más veces ha predicho, ya que habrá veces que prediga mal
+def most_common(predicciones):
+    return INSTRUMENTS[max(set(predicciones), key=predicciones.count)]
