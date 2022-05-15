@@ -127,6 +127,13 @@ def fit(epochs, lr, model, train_loader, val_loader, opt_func=torch.optim.SGD):
 
     return history
 
+# Cargamos el modelo y lo devolvemos a partir de un fichero que se encuentra 
+# en la ruta = <ruta> y el device lo ajustamos al que tengamos
+def cargarModelo(ruta, device):
+    model = ModeloCNN(device)
+    model.load_state_dict(torch.load(ruta, map_location=device))
+    return model
+
 # Hacemos un predict sobre un input y devolvemos el índice de clase predicho
 def single_predict(model, input):
     model.eval()
