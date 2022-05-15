@@ -10,17 +10,22 @@ import librosa.display
 import json
 import matplotlib.pyplot as plt
 
+# Funcion para organizar todos los espectrogramas por carpetas (labels)
 def organize_images(path):
     ficheros = os.listdir(path)
-    pathInicial = path[:]
+    pathInicial = path[:] # Almacenamos el path del que partimos
 
+    # Tendremos que, para cada espectroagrama, crear una carpeta en caso de que no exista ya una carpeta con su label y mover el espectrograma a dicha carpeta
     for i in ficheros:
         if "png" in i:
             classification = i.index("_")
-            directorio = i[:classification]
+            directorio = i[:classification] # Calculamos el label que tendrá el directorio de la imagen
 
+            # El nuevo path de la imagen será el pathInicial/directorio/
             nuevoPath = pathInicial + directorio + "/"
 
+            # Tratamos de actualizar la imagen al nuevo path, en caso de que el directorio no exista, crear carpeta y moverlo
+            # Si la imagen tiene ruta: pathInicial/<imagen> lo intentamos cambiar a: pathIncial/<directorio>/<imagen>
             try:
                 os.rename(path + i, nuevoPath + i)
             except:

@@ -8,35 +8,39 @@ import os
 import torch.nn as nn
 import torch.nn.functional as F
 
-
+# Creamos una clase de clasificacion de imagenes para que el modelo pueda hacer uso de esta
 class ImageClassificationBase(nn.Module):
     def __init__(self, device):
         super().__init__()
         self.device = device
         self.to(device)
 
+    # Definimos el training step
     def training_step(self, batch):
         images, labels = batch[0].to(self.device), batch[1].to(self.device)
         out = self(images)  # Generate predictions
-        loss = F.cross_entropy(out, labels)  # Calculate loss
+        loss = F.cross_entropy(out, labels)  # Calculamos la perdida
         return loss
 
+    # Definimos la validacion del step (definir la entropía para la perdida) para ajustar mejor la accuracy
     def validation_step(self, batch):
         images, labels = batch[0].to(self.device), batch[1].to(self.device)
-        out = self(images)  # Generate predictions
-        loss = F.cross_entropy(out, labels)  # Calculate loss
-        acc = accuracy(out, labels)  # Calculate accuracy
+        out = self(images)  # Generamos las predicciones
+        loss = F.cross_entropy(out, labels)  # Calculamos la perdida
+        acc = accuracy(out, labels)  # Calculamos la accuracy
         #         self.images=images
         #         self.labels=labels
         return {'val_loss': loss.detach(), 'val_acc': acc}
 
+    # Validacion de la epoca
     def validation_epoch_end(self, outputs):
         batch_losses = [x['val_loss'] for x in outputs]
-        epoch_loss = torch.stack(batch_losses).mean()  # Combine losses
+        epoch_loss = torch.stack(batch_losses).mean()  # Añadimos todas las perdidas de la epoca
         batch_accs = [x['val_acc'] for x in outputs]
-        epoch_acc = torch.stack(batch_accs).mean()  # Combine accuracies
+        epoch_acc = torch.stack(batch_accs).mean()  # Añadimos todas las accuracy s de la epoca
         return {'val_loss': epoch_loss.item(), 'val_acc': epoch_acc.item()}
 
+    # Cada final de epoca mostrar los detalles
     def epoch_end(self, epoch, result):
         print("Epoch [{}], train_loss: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}".format(
             epoch, result['train_loss'], result['val_loss'], result['val_acc']))
@@ -77,40 +81,44 @@ class ModeloCNN(ImageClassificationBase):
             nn.LogSoftmax(dim=1)
         )
 
+    # Devolvemos la topología del modelo
     def forward(self, xb):
         return self.network(xb)
 
-
+# Definimos nuestra propia funcion para evaluar la accuracy
 def accuracy(outputs, labels):
     _, preds = torch.max(outputs, dim=1)
-    return torch.tensor((torch.sum(preds == labels).item() / len(preds)))
+    return torch.tensor((torch.sum(preds == labels).item() / len(preds))) # Contamos la cantidad de predicciones que ha acertado y lo dividimos entre el numero de predicciones hechas
 
-
+# Evaluamos el modelo para 1 batch
 @torch.no_grad()
 def evaluate(model, val_loader):
-    model.eval()
-    outputs = [model.validation_step(batch) for batch in val_loader]
+    model.eval() # Método de pytorch
+    outputs = [model.validation_step(batch) for batch in val_loader] # Aquí tendremos los outputs de cada trainig step
     #     print(outputs)
-    return model.validation_epoch_end(outputs)
+    return model.validation_epoch_end(outputs) # Aquí tendremos los outputs del final de la epoca
 
-
+# Definimos el fit para nuestros datos al modelo
 def fit(epochs, lr, model, train_loader, val_loader, opt_func=torch.optim.SGD):
-    history = []
-    optimizer = opt_func(model.parameters(), lr)
+    history = [] # Creamos una lista para llevar una "memoria" de cada epoca
+    optimizer = opt_func(model.parameters(), lr) # Definimos el optimizador
     for epoch in range(epochs):
 
-        model.train()
-        train_losses = []
+        model.train() # Método de pytorch para entrenar el modelo cada época
+        train_losses = [] # Lista para poder ir añadiendo las pérdidas al modelo
 
-        for batch in train_loader:
-            loss = model.training_step(batch)
-            train_losses.append(loss)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+        for batch in train_loader: # Evaluamos todas las imagenes del dataset de entrenamiento
+            loss = model.training_step(batch) # Entrenamos un paso y le pasamos un batch de imagenes
+            train_losses.append(loss) # Añadimos las pérdidas
+            loss.backward() # Método de pytorch donde pretende analizar dloss/dx para cada parametro x
+            optimizer.step() # Método de pytorch para actualizar los parametros
+            optimizer.zero_grad() # Método de pytorch que setea los gradientes de todos los tensores optimizados a 0
 
+        # Evaluamos los datos y añadimos las pérdidas de la epoca
         result = evaluate(model, val_loader)
         result['train_loss'] = torch.stack(train_losses).mean().item()
+        
+        # Recopilamos los datos de la epoca y los añadimos al historial
         model.epoch_end(epoch, result)
         history.append(result)
 
